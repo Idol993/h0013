@@ -4,6 +4,9 @@ const QWEATHER_BASE = 'https://devapi.qweather.com';
 const GEO_BASE = 'https://geoapi.qweather.com';
 const API_TIMEOUT = 5000;
 const MAX_RETRY = 1;
+const CITY_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+let cityCache = null;
 
 const weatherMap = {
   '100': { text: '晴', emoji: '☀️' },
@@ -16,46 +19,46 @@ const weatherMap = {
   '152': { text: '少云', emoji: '⛅' },
   '153': { text: '晴间多云', emoji: '⛅' },
   '154': { text: '阴', emoji: '☁️' },
-  '300': { text: '阵雨', emoji: '🌧️' },
-  '301': { text: '强阵雨', emoji: '🌧️' },
-  '302': { text: '雷阵雨', emoji: '🌧️' },
-  '303': { text: '强雷阵雨', emoji: '🌧️' },
-  '304': { text: '雷阵雨伴有冰雹', emoji: '🌧️' },
-  '305': { text: '小雨', emoji: '🌧️' },
-  '306': { text: '中雨', emoji: '🌧️' },
-  '307': { text: '大雨', emoji: '🌧️' },
-  '308': { text: '极端降雨', emoji: '🌧️' },
-  '309': { text: '毛毛雨', emoji: '🌧️' },
-  '310': { text: '暴雨', emoji: '🌧️' },
-  '311': { text: '大暴雨', emoji: '🌧️' },
-  '312': { text: '特大暴雨', emoji: '🌧️' },
-  '313': { text: '冻雨', emoji: '🌧️' },
-  '314': { text: '小到中雨', emoji: '🌧️' },
-  '315': { text: '中到大雨', emoji: '🌧️' },
-  '316': { text: '大到暴雨', emoji: '🌧️' },
-  '317': { text: '暴雨到大暴雨', emoji: '🌧️' },
-  '318': { text: '大暴雨到特大暴雨', emoji: '🌧️' },
-  '350': { text: '阵雨', emoji: '🌧️' },
-  '351': { text: '强阵雨', emoji: '🌧️' },
-  '399': { text: '雨', emoji: '🌧️' },
-  '400': { text: '小雪', emoji: '❄️' },
-  '401': { text: '中雪', emoji: '❄️' },
-  '402': { text: '大雪', emoji: '❄️' },
-  '403': { text: '暴雪', emoji: '❄️' },
-  '404': { text: '雨夹雪', emoji: '🌨️' },
-  '405': { text: '雨雪天气', emoji: '🌨️' },
-  '406': { text: '阵雨夹雪', emoji: '🌨️' },
-  '407': { text: '阵雪', emoji: '❄️' },
-  '408': { text: '小到中雪', emoji: '❄️' },
-  '409': { text: '中到大雪', emoji: '❄️' },
-  '410': { text: '大到暴雪', emoji: '❄️' },
-  '456': { text: '阵雨夹雪', emoji: '🌨️' },
-  '457': { text: '阵雪', emoji: '❄️' },
-  '499': { text: '雪', emoji: '❄️' },
+  '300': { text: '阵雨', emoji: '🌧️', level: 'light' },
+  '301': { text: '强阵雨', emoji: '🌧️', level: 'moderate' },
+  '302': { text: '雷阵雨', emoji: '⛈️', level: 'moderate' },
+  '303': { text: '强雷阵雨', emoji: '⛈️', level: 'heavy' },
+  '304': { text: '雷阵雨伴有冰雹', emoji: '⛈️', level: 'heavy' },
+  '305': { text: '小雨', emoji: '🌧️', level: 'light' },
+  '306': { text: '中雨', emoji: '🌧️', level: 'light' },
+  '307': { text: '大雨', emoji: '🌧️', level: 'heavy' },
+  '308': { text: '极端降雨', emoji: '🌧️', level: 'heavy' },
+  '309': { text: '毛毛雨', emoji: '🌧️', level: 'light' },
+  '310': { text: '暴雨', emoji: '🌧️', level: 'heavy' },
+  '311': { text: '大暴雨', emoji: '🌧️', level: 'heavy' },
+  '312': { text: '特大暴雨', emoji: '🌧️', level: 'heavy' },
+  '313': { text: '冻雨', emoji: '🌧️', level: 'moderate' },
+  '314': { text: '小到中雨', emoji: '🌧️', level: 'light' },
+  '315': { text: '中到大雨', emoji: '🌧️', level: 'moderate' },
+  '316': { text: '大到暴雨', emoji: '🌧️', level: 'heavy' },
+  '317': { text: '暴雨到大暴雨', emoji: '🌧️', level: 'heavy' },
+  '318': { text: '大暴雨到特大暴雨', emoji: '🌧️', level: 'heavy' },
+  '350': { text: '阵雨', emoji: '🌧️', level: 'light' },
+  '351': { text: '强阵雨', emoji: '🌧️', level: 'moderate' },
+  '399': { text: '雨', emoji: '🌧️', level: 'light' },
+  '400': { text: '小雪', emoji: '❄️', level: 'light' },
+  '401': { text: '中雪', emoji: '❄️', level: 'moderate' },
+  '402': { text: '大雪', emoji: '❄️', level: 'heavy' },
+  '403': { text: '暴雪', emoji: '❄️', level: 'heavy' },
+  '404': { text: '雨夹雪', emoji: '🌨️', level: 'light' },
+  '405': { text: '雨雪天气', emoji: '🌨️', level: 'moderate' },
+  '406': { text: '阵雨夹雪', emoji: '🌨️', level: 'light' },
+  '407': { text: '阵雪', emoji: '❄️', level: 'light' },
+  '408': { text: '小到中雪', emoji: '❄️', level: 'light' },
+  '409': { text: '中到大雪', emoji: '❄️', level: 'moderate' },
+  '410': { text: '大到暴雪', emoji: '❄️', level: 'heavy' },
+  '456': { text: '阵雨夹雪', emoji: '🌨️', level: 'light' },
+  '457': { text: '阵雪', emoji: '❄️', level: 'light' },
+  '499': { text: '雪', emoji: '❄️', level: 'light' },
 };
 
 function getWeatherInfo(code) {
-  return weatherMap[code] || { text: '未知', emoji: '❓' };
+  return weatherMap[code] || { text: '未知', emoji: '❓', level: 'normal' };
 }
 
 async function requestWithRetry(url, params, retryCount = 0) {
@@ -73,7 +76,7 @@ async function requestWithRetry(url, params, retryCount = 0) {
   }
 }
 
-async function getCityId(cityName, apiKey) {
+async function fetchCityId(cityName, apiKey) {
   const data = await requestWithRetry(`${GEO_BASE}/v2/city/lookup`, {
     location: cityName,
     key: apiKey,
@@ -83,7 +86,45 @@ async function getCityId(cityName, apiKey) {
     throw new Error(`城市查询失败: ${data.message || '未知错误'}`);
   }
 
-  return data.location[0].id;
+  return {
+    id: data.location[0].id,
+    name: data.location[0].name,
+    adm: data.location[0].adm1,
+  };
+}
+
+async function getCityId(cityName, apiKey) {
+  const now = Date.now();
+
+  if (
+    cityCache &&
+    cityCache.cityName === cityName &&
+    cityCache.apiKey === apiKey &&
+    now - cityCache.timestamp < CITY_CACHE_TTL
+  ) {
+    return cityCache.cityInfo;
+  }
+
+  try {
+    const cityInfo = await fetchCityId(cityName, apiKey);
+    cityCache = {
+      cityName,
+      apiKey,
+      cityInfo,
+      timestamp: now,
+    };
+    return cityInfo;
+  } catch (error) {
+    if (cityCache && cityCache.cityName === cityName) {
+      console.warn(`[缓存兜底] 城市查询失败，使用缓存数据: ${error.message}`);
+      return cityCache.cityInfo;
+    }
+    throw error;
+  }
+}
+
+function clearCityCache() {
+  cityCache = null;
 }
 
 async function getWeatherForecast(cityId, apiKey) {
@@ -99,12 +140,59 @@ async function getWeatherForecast(cityId, apiKey) {
   return data.daily;
 }
 
+function getWeatherRisk(weather) {
+  const risks = [];
+  const suggestions = [];
+
+  const weatherInfo = getWeatherInfo(weather.iconDay);
+
+  if (weatherInfo.level === 'heavy') {
+    risks.push('强降水');
+    suggestions.push(`有${weatherInfo.text}，户外活动建议取消或改期`);
+  } else if (weatherInfo.level === 'moderate') {
+    risks.push('降水');
+    suggestions.push(`有${weatherInfo.text}，户外活动请备防雨装备`);
+  }
+
+  const windScale = parseInt(weather.windScaleDay, 10);
+  if (windScale >= 6) {
+    risks.push('大风');
+    suggestions.push(`${weather.windDir}${weather.windScaleDay}级大风，高空/水上活动请注意安全`);
+  }
+
+  const tempMax = parseInt(weather.tempMax, 10);
+  if (tempMax >= 35) {
+    risks.push('高温');
+    suggestions.push(`最高温${tempMax}°C，高温天气注意防暑降温，避免正午户外活动`);
+  }
+
+  const tempMin = parseInt(weather.tempMin, 10);
+  if (tempMin <= 0) {
+    risks.push('低温');
+    suggestions.push(`最低温${tempMin}°C，低温天气注意保暖防寒`);
+  }
+
+  if (risks.length === 0) {
+    return {
+      level: 'normal',
+      summary: '天气总体良好，适合户外活动',
+      details: [],
+    };
+  }
+
+  return {
+    level: risks.some((r) => ['强降水', '高温'].includes(r)) ? 'warning' : 'notice',
+    summary: `注意：${risks.join('、')}`,
+    details: suggestions,
+  };
+}
+
 function parseWeatherData(dailyData, dayIndex) {
   const day = dailyData[dayIndex];
   const weatherInfo = getWeatherInfo(day.iconDay);
-  const rainProb = parseInt(day.precip || '0', 10);
+  const rainProb = parseInt(day.pop || '0', 10);
 
-  return {
+  const weather = {
     date: day.fxDate,
     textDay: weatherInfo.text,
     emoji: weatherInfo.emoji,
@@ -114,7 +202,13 @@ function parseWeatherData(dailyData, dayIndex) {
     windScale: day.windScaleDay,
     windDir: day.windDirDay,
     rainProb,
+    precip: day.precip,
+    iconDay: day.iconDay,
   };
+
+  weather.risk = getWeatherRisk(weather);
+
+  return weather;
 }
 
 function buildDingtalkMessage(weather, title, warnThreshold) {
@@ -123,6 +217,26 @@ function buildDingtalkMessage(weather, title, warnThreshold) {
   lines.push('');
   lines.push(`**${weather.date}**`);
   lines.push('');
+
+  if (weather.risk.level === 'warning') {
+    lines.push(`<font color="red">⚠️ ${weather.risk.summary}</font>`);
+    lines.push('');
+    weather.risk.details.forEach((detail) => {
+      lines.push(`<font color="red">• ${detail}</font>`);
+      lines.push('');
+    });
+  } else if (weather.risk.level === 'notice') {
+    lines.push(`<font color="orange">📌 ${weather.risk.summary}</font>`);
+    lines.push('');
+    weather.risk.details.forEach((detail) => {
+      lines.push(`<font color="orange">• ${detail}</font>`);
+      lines.push('');
+    });
+  } else {
+    lines.push(`✅ ${weather.risk.summary}`);
+    lines.push('');
+  }
+
   lines.push(`### ${weather.emoji} ${weather.textDay}`);
   lines.push('');
   lines.push(`🌡️ ${weather.tempMin}°C ~ ${weather.tempMax}°C`);
@@ -134,8 +248,8 @@ function buildDingtalkMessage(weather, title, warnThreshold) {
   lines.push(`🌧️ 降雨概率: ${weather.rainProb}%`);
   lines.push('');
 
-  if (weather.rainProb >= warnThreshold) {
-    lines.push(`<font color="red">⚠️ 降雨概率超过${warnThreshold}%，请记得带伞，户外活动注意调整方案！</font>`);
+  if (weather.rainProb > warnThreshold) {
+    lines.push(`<font color="red">⚠️ 降雨概率${weather.rainProb}%，超过预警阈值${warnThreshold}%，请记得带伞，户外活动注意调整方案！</font>`);
     lines.push('');
   }
 
@@ -144,7 +258,7 @@ function buildDingtalkMessage(weather, title, warnThreshold) {
   return {
     msgtype: 'markdown',
     markdown: {
-      title: title.replace(/\*\*/g, ''),
+      title: title.replace(/[\*\*]/g, '').trim(),
       text: lines.join('\n'),
     },
   };
@@ -152,7 +266,9 @@ function buildDingtalkMessage(weather, title, warnThreshold) {
 
 module.exports = {
   getCityId,
+  clearCityCache,
   getWeatherForecast,
   parseWeatherData,
   buildDingtalkMessage,
+  getWeatherRisk,
 };
