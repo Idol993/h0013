@@ -1,0 +1,17 @@
+{
+  "name": "weather-dingtalk-pusher",
+  "version": "1.0.0",
+  "description": "每日天气预报自动推送至钉钉群",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.0",
+    "node-schedule": "^2.1.1"
+  }
+}
